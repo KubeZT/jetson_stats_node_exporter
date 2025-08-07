@@ -45,21 +45,16 @@ class JetsonExporter(object):
         return cpu_gauge
 
     def __gpu(self):
-        gpu_gauge = GaugeMetricFamily(
+        gpu_util_gauge = GaugeMetricFamily(
             name="gpu_utilization_percentage",
-            documentation="GPU Statistics from Jetson Stats",
-            labels=["statistic", "nvidia_gpu"],
-            unit="Hz"
+            documentation="Flat GPU Utilization from Jetson Stats (top-level key)",
+            labels=["gpu"],
         )
 
-        gpu_names = self.jetson.jtop_stats["gpu"].keys()
+        value = self.jetson.jtop_stats.get("GPU", 0.0)
+        gpu_util_gauge.add_metric(["GPU0"], value)
 
-        for gpu_name in gpu_names:
-            gpu_gauge.add_metric([gpu_name, "freq"], value=self.jetson.jtop_stats["gpu"][gpu_name]["freq"]["cur"])
-            gpu_gauge.add_metric([gpu_name, "min_freq"], value=self.jetson.jtop_stats["gpu"][gpu_name]["freq"]["min"])
-            gpu_gauge.add_metric([gpu_name, "max_freq"], value=self.jetson.jtop_stats["gpu"][gpu_name]["freq"]["max"])
-
-        return gpu_gauge
+        return gpu_util_gauge
 
     def __gpuram(self):
         gpuram_gauge = GaugeMetricFamily(
