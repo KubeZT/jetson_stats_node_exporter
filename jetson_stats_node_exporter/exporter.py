@@ -1,7 +1,9 @@
+import logging
+import pprint
+
 from prometheus_client.core import GaugeMetricFamily
 from .logger import factory
 from .jtop_stats import JtopObservable
-
 
 class Jetson(object):
     def __init__(self, update_period=1):
@@ -29,20 +31,61 @@ class JetsonExporter(object):
         self.name = "Jetson"
 
     def __cpu(self):
+        logging.debug("Starting __cpu() method")
+        cpu_data = self.jetson.jtop_stats.get("cpu", {})
+        logging.debug(f"Raw jtop_stats['cpu']: {pprint.pformat(cpu_data)}")
+
         cpu_gauge = GaugeMetricFamily(
-            name="cpu",
-            documentation="CPU Statistics from Jetson Stats (ARMv8 Processor rev 1 (v8l))",
+            name="cpu_Hz",
+            documentation="CPU frequency statistics per core",
             labels=["core", "statistic"],
             unit="Hz"
         )
 
-        for core_number, core_data in enumerate(self.jetson.jtop_stats["cpu"]["cpu"]):
-            if core_data["online"]:
-                cpu_gauge.add_metric([str(core_number), "freq"], value=core_data["freq"]["cur"])
-                cpu_gauge.add_metric([str(core_number), "min_freq"], value=core_data["freq"]["min"])
-                cpu_gauge.add_metric([str(core_number), "max_freq"], value=core_data["freq"]["max"])
-                cpu_gauge.add_metric([str(core_number), "val"], value=core_data["idle"])
-        return cpu_gauge
+        cpu_usage = GaugeMetricFamily(
+            name="cpu_percent",
+            documentation="CPU usage percentage per core and total",
+            labels=["core", "mode"],
+            unit="percent"
+        )
+
+        core_list = cpu_data.get("cpu", [])
+        logging.debug(f"Found {len(core_list)} cores")
+
+        for core_number, core_data in enumerate(core_list):
+            logging.debug(f"Core {core_number} data: {core_data}")
+            if not core_data.get("online", False):
+                continue
+
+            freq = core_data.get("freq", {})
+            cpu_gauge.add_metric([str(core_number), "cur"], freq.get("cur", 0))
+            cpu_gauge.add_metric([str(core_number), "min"], freq.get("min", 0))
+            cpu_gauge.add_metric([str(core_number), "max"], freq.get("max", 0))
+
+            cpu_usage.add_metric([str(core_number), "user"], core_data.get("user", 0))
+            cpu_usage.add_metric([str(core_number), "nice"], core_data.get("nice", 0))
+            cpu_usage.add_metric([str(core_number), "system"], core_data.get("system", 0))
+            cpu_usage.add_metric([str(core_number), "idle"], core_data.get("idle", 0))
+
+        total_data = cpu_data.get("total", {})
+        logging.debug(f"Total CPU data: {total_data}")
+        if total_data:
+            cpu_usage.add_metric(["total", "user"], total_data.get("user", 0))
+            cpu_usage.add_metric(["total", "nice"], total_data.get("nice", 0))
+            cpu_usage.add_metric(["total", "system"], total_data.get("system", 0))
+            cpu_usage.add_metric(["total", "idle"], total_data.get("idle", 0))
+
+        metrics = [cpu_gauge, cpu_usage]
+
+        logging.debug(f"__cpu() returning raw metrics: {metrics}")
+        for i, metric in enumerate(metrics):
+            logging.debug(f"Metric {i} type: {type(metric)}")
+            logging.debug(f"Metric {i} dir: {dir(metric)}")
+            if hasattr(metric, '__dict__'):
+                logging.debug(f"Metric {i} __dict__: {pprint.pformat(metric.__dict__)}")
+
+        logging.debug(f"__cpu() returning metrics: {[type(m) for m in metrics]}")
+        return metrics
 
     def __gpu(self):
         gpu_util_gauge = GaugeMetricFamily(
@@ -198,7 +241,8 @@ class JetsonExporter(object):
 
     def collect(self):
         self.jetson.update()
-        yield self.__cpu()
+        for metric in self.__cpu():
+            yield metric
         yield self.__gpu()
         yield self.__ram()
         yield self.__gpuram()
