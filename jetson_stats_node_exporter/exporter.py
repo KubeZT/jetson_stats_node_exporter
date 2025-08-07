@@ -18,6 +18,7 @@ class Jetson(object):
     def update(self):
         self.jtop_stats = self.jtop_observer.read_stats()
         self.disk, self.disk_units = self.jtop_observer.get_storage_info()
+        self.network = self.jtop_observer.get_network_bandwidth()
 
 
 class JetsonExporter(object):
@@ -187,6 +188,19 @@ class JetsonExporter(object):
         uptime_gauge.add_metric(["alive"], value=self.jetson.jtop_stats["upt"].total_seconds())
         return uptime_gauge
 
+    def __network_bandwidth(self):
+        network_gauge = GaugeMetricFamily(
+            name="network_bandwidth_bytes_per_second",
+            documentation="Network bandwidth usage per interface (bytes/sec)",
+            labels=["interface", "direction"]
+        )
+
+        for iface, stats in self.jetson.network.items():
+            network_gauge.add_metric([iface, "rx"], stats["rx_bytes_per_sec"])
+            network_gauge.add_metric([iface, "tx"], stats["tx_bytes_per_sec"])
+
+        return network_gauge
+
     def collect(self):
         self.jetson.update()
         yield self.__cpu()
@@ -200,3 +214,4 @@ class JetsonExporter(object):
         yield self.__integrated_power_total()
         yield self.__disk()
         yield self.__uptime()
+        yield self.__network_bandwidth()

@@ -1,11 +1,14 @@
 import psutil
 from jtop import jtop
-
+import time
 
 class JtopObservable(object):
 
     def __init__(self, update_period=0.5):
         self.data = {}
+
+        self.prev_net_io = psutil.net_io_counters(pernic=True)
+        self.last_net_time = time.time()
 
         with jtop(interval=update_period) as jetson:
             self.jetson = jetson
@@ -41,3 +44,25 @@ class JtopObservable(object):
                 self.storage_data[partition.mountpoint][metric] = value / unit_factor  # Conversion from B to GB
 
         return self.storage_data, unit
+
+
+    def get_network_bandwidth(self):
+        now = time.time()
+        current = psutil.net_io_counters(pernic=True)
+        interval = now - self.last_net_time
+
+        result = {}
+        for iface, stats in current.items():
+            if iface not in self.prev_net_io:
+                continue
+            prev_stats = self.prev_net_io[iface]
+            rx_rate = (stats.bytes_recv - prev_stats.bytes_recv) / interval
+            tx_rate = (stats.bytes_sent - prev_stats.bytes_sent) / interval
+            result[iface] = {
+                "rx_bytes_per_sec": rx_rate,
+                "tx_bytes_per_sec": tx_rate
+            }
+
+        self.prev_net_io = current
+        self.last_net_time = now
+        return result
