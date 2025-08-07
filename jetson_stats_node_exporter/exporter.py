@@ -67,7 +67,7 @@ class JetsonExporter(object):
         gpu_names = self.jetson.jtop_stats["gpu"].keys()
 
         for gpu_name in gpu_names:
-            gpuram_gauge.add_metric([gpu_name, "mem"], value=self.jetson.jtop_stats["mem"]["RAM"]["shared"])
+            gpuram_gauge.add_metric([gpu_name, "mem"], value=self.jetson.jtop_stats["memory"]["RAM"]["shared"])
 
         return gpuram_gauge
 
@@ -79,12 +79,12 @@ class JetsonExporter(object):
             unit="kB"
         )
 
-        ram_gauge.add_metric(["total"], value=self.jetson.jtop_stats["mem"]["RAM"]["tot"])
-        ram_gauge.add_metric(["used"], value=self.jetson.jtop_stats["mem"]["RAM"]["used"])
-        ram_gauge.add_metric(["buffers"], value=self.jetson.jtop_stats["mem"]["RAM"]["buffers"])
-        ram_gauge.add_metric(["cached"], value=self.jetson.jtop_stats["mem"]["RAM"]["cached"])
-        ram_gauge.add_metric(["lfb"], value=self.jetson.jtop_stats["mem"]["RAM"]["lfb"])
-        ram_gauge.add_metric(["free"], value=self.jetson.jtop_stats["mem"]["RAM"]["free"])
+        ram_gauge.add_metric(["total"], value=self.jetson.jtop_stats["memory"]["RAM"]["tot"])
+        ram_gauge.add_metric(["used"], value=self.jetson.jtop_stats["memory"]["RAM"]["used"])
+        ram_gauge.add_metric(["buffers"], value=self.jetson.jtop_stats["memory"]["RAM"]["buffers"])
+        ram_gauge.add_metric(["cached"], value=self.jetson.jtop_stats["memory"]["RAM"]["cached"])
+        ram_gauge.add_metric(["lfb"], value=self.jetson.jtop_stats["memory"]["RAM"]["lfb"])
+        ram_gauge.add_metric(["free"], value=self.jetson.jtop_stats["memory"]["RAM"]["free"])
 
         return ram_gauge
 
@@ -96,9 +96,9 @@ class JetsonExporter(object):
             unit="kB"
         )
 
-        swap_gauge.add_metric(["total"], value=self.jetson.jtop_stats["mem"]["SWAP"]["tot"])
-        swap_gauge.add_metric(["used"], value=self.jetson.jtop_stats["mem"]["SWAP"]["used"])
-        swap_gauge.add_metric(["cached"], value=self.jetson.jtop_stats["mem"]["SWAP"]["cached"])
+        swap_gauge.add_metric(["total"], value=self.jetson.jtop_stats["memory"]["SWAP"]["tot"])
+        swap_gauge.add_metric(["used"], value=self.jetson.jtop_stats["memory"]["SWAP"]["used"])
+        swap_gauge.add_metric(["cached"], value=self.jetson.jtop_stats["memory"]["SWAP"]["cached"])
 
         return swap_gauge
 
@@ -110,9 +110,9 @@ class JetsonExporter(object):
             unit="Hz"
         )
 
-        emc_gauge.add_metric(["total"], value=self.jetson.jtop_stats["mem"]["EMC"]["cur"])
-        emc_gauge.add_metric(["used"], value=self.jetson.jtop_stats["mem"]["EMC"]["max"])
-        emc_gauge.add_metric(["cached"], value=self.jetson.jtop_stats["mem"]["EMC"]["min"])
+        emc_gauge.add_metric(["total"], value=self.jetson.jtop_stats["memory"]["EMC"]["cur"])
+        emc_gauge.add_metric(["used"], value=self.jetson.jtop_stats["memory"]["EMC"]["max"])
+        emc_gauge.add_metric(["cached"], value=self.jetson.jtop_stats["memory"]["EMC"]["min"])
 
         return emc_gauge
 
@@ -123,7 +123,7 @@ class JetsonExporter(object):
             labels=["statistic", "machine_part", "system_critical"],
             unit="C"
         )
-        for part, temp in self.jetson.jtop_stats['tmp'].items():
+        for part, temp in self.jetson.jtop_stats['temperature'].items():
             temperature_gauge.add_metric([part], value=temp["temp"])
 
         return temperature_gauge
@@ -135,7 +135,7 @@ class JetsonExporter(object):
             labels=["statistic", "machine_part", "system_critical"]
         )
 
-        for part, reading in self.jetson.jtop_stats["pwr"]["rail"].items():
+        for part, reading in self.jetson.jtop_stats["power"]["rail"].items():
             power_gauge.add_metric(["voltage", part], value=reading["volt"])
             power_gauge.add_metric(["current", part], value=reading["curr"])
             power_gauge.add_metric(["critical", part], value=reading["warn"])
@@ -152,8 +152,8 @@ class JetsonExporter(object):
             unit="mW"
         )
 
-        power_gauge.add_metric(["power"], value=self.jetson.jtop_stats["pwr"]["tot"]["power"])
-        power_gauge.add_metric(["avg_power"], value=self.jetson.jtop_stats["pwr"]["tot"]["avg"])
+        power_gauge.add_metric(["power"], value=self.jetson.jtop_stats["power"]["tot"]["power"])
+        power_gauge.add_metric(["avg_power"], value=self.jetson.jtop_stats["power"]["tot"]["avg"])
 
         return power_gauge
 
@@ -180,7 +180,7 @@ class JetsonExporter(object):
             labels=["statistic", "runtime"],
             unit="s"
         )
-        uptime_gauge.add_metric(["alive"], value=self.jetson.jtop_stats["upt"].total_seconds())
+        uptime_gauge.add_metric(["alive"], value=self.jetson.jtop_stats["uptime"].total_seconds())
         return uptime_gauge
 
     def __network_bandwidth(self):
