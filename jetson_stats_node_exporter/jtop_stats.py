@@ -15,18 +15,19 @@ class JtopObservable(object):
 
     def read_stats(self):
         self.data = {
-            "stats": self.jetson.stats,
-            "board": self.jetson.board,
             "cpu": self.jetson.cpu,
-            "mem": self.jetson.memory,
+            "disk": self.jetson.disk,
+            "fan": self.jetson.fan,
             "gpu": self.jetson.gpu,
-            # "iram": self.jetson.iram,
-            "pwr": self.jetson.power,
-            # "swp": self.jetson.swap,
-            "tmp": self.jetson.temperature,
-            "upt": self.jetson.uptime
+            "jetson_clocks": self.jetson.jetson_clocks,
+            "memory": self.jetson.memory,
+            "nvpmodel": self.jetson.nvpmodel,
+            "power": self.jetson.power,
+            "processes": self.jetson.processes,
+            "stats": self.jetson.stats,
+            "temperature": self.jetson.temperature,
+            "uptime": self.jetson.uptime
         }
-
         return self.data
 
     def get_storage_info(self):
