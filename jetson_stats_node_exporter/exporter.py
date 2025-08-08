@@ -1,5 +1,6 @@
 import logging
 import pprint
+import socket
 
 from prometheus_client.core import GaugeMetricFamily
 from .logger import factory
@@ -28,7 +29,7 @@ class JetsonExporter(object):
     def __init__(self, update_period):
         self.jetson = Jetson(update_period)
         self.logger = factory(__name__)
-        self.name = "Jetson"
+        self.name = socket.gethostname().split(".")[0]
 
     def __cpu(self):
         logging.debug("Starting __cpu() method")
