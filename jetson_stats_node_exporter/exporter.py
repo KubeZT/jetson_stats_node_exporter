@@ -123,6 +123,28 @@ class JetsonExporter(object):
 
         return [gpu_util_gauge, gpu_freq]
 
+    def __ram(self):
+        logging.debug("Starting __ram() method")
+
+        ram_data = self.jetson.jtop_stats.get("memory", {}).get("RAM", {})
+        logging.debug(f"RAM data: {ram_data}")
+
+        ram_gauge = GaugeMetricFamily(
+            name="ram",
+            documentation="Memory Statistics from Jetson Stats (unit: kB)",
+            labels=["statistic"],
+            unit="kB"
+        )
+
+        ram_gauge.add_metric(["total"], ram_data.get("tot", 0))
+        ram_gauge.add_metric(["used"], ram_data.get("used", 0))
+        ram_gauge.add_metric(["free"], ram_data.get("free", 0))
+        ram_gauge.add_metric(["buffers"], ram_data.get("buffers", 0))
+        ram_gauge.add_metric(["cached"], ram_data.get("cached", 0))
+        ram_gauge.add_metric(["shared"], ram_data.get("shared", 0))
+
+        return ram_gauge
+
     def __swap(self):
         swap_gauge = GaugeMetricFamily(
             name="swap",
