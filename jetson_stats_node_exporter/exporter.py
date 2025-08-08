@@ -259,8 +259,8 @@ class JetsonExporter(object):
             yield metric
         for metric in self.__gpu():
             yield metric
-        yield self.__ram()
-        yield self.__gpuram()
+        for metric in self.__ram():
+            yield metric
         yield self.__swap()
         yield self.__emc()
         yield self.__temperature()
