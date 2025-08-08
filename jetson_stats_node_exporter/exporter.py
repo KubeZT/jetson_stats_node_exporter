@@ -99,9 +99,10 @@ class JetsonExporter(object):
         logging.debug(f"GPU Load: {load}")
 
         gpu_util_gauge = GaugeMetricFamily(
-            name="gpu_utilization_percentage",
-            documentation="GPU load utilization percentage from jtop",
-            labels=["gpu"]
+            name="gpu_utilization_percent",
+            documentation="GPU load utilization percent from jtop",
+            labels=["gpu"],
+            unit="percent"
         )
         gpu_util_gauge.add_metric(["integrated"], load)
 
@@ -171,9 +172,9 @@ class JetsonExporter(object):
 
         emc = self.jetson.jtop_stats.get("memory", {}).get("EMC", {})
 
-        emc_gauge.add_metric(["total"], value=emc.get("cur", 0))
-        emc_gauge.add_metric(["used"], value=emc.get("max", 0))
-        emc_gauge.add_metric(["cached"], value=emc.get("min", 0))
+        emc_gauge.add_metric(["cur"], value=emc.get("cur", 0))
+        emc_gauge.add_metric(["max"], value=emc.get("max", 0))
+        emc_gauge.add_metric(["min"], value=emc.get("min", 0))
 
         return [emc_gauge]
 
@@ -204,23 +205,58 @@ class JetsonExporter(object):
         power_data = self.jetson.jtop_stats.get("power", {}).get("rail", {})
         logging.debug(f"Power rail data: {power_data}")
 
+        voltage_gauge = GaugeMetricFamily(
+            name="power_voltage_millivolts",
+            documentation="Voltage per power rail",
+            labels=["machine_part", "system_critical"],
+            unit="mV"
+        )
+
+        current_gauge = GaugeMetricFamily(
+            name="power_current_milliamps",
+            documentation="Current per power rail",
+            labels=["machine_part", "system_critical"],
+            unit="mA"
+        )
+
         power_gauge = GaugeMetricFamily(
-            name="integrated_power",
-            documentation="Power Statistics from internal power sensors (unit: mW/mV/mA)",
-            labels=["statistic", "machine_part", "system_critical"]
+            name="power_consumption_milliwatts",
+            documentation="Instantaneous power per power rail",
+            labels=["machine_part", "system_critical"],
+            unit="mW"
+        )
+
+        avg_power_gauge = GaugeMetricFamily(
+            name="power_average_milliwatts",
+            documentation="Average power per power rail",
+            labels=["machine_part", "system_critical"],
+            unit="mW"
+        )
+
+        warn_threshold_gauge = GaugeMetricFamily(
+            name="power_warn_threshold_milliwatts",
+            documentation="Warning threshold per power rail",
+            labels=["machine_part", "system_critical"],
+            unit="mW"
         )
 
         for part, reading in power_data.items():
             online = reading.get("online", False)
             system_critical = str(not online or reading.get("warn", 0) > 80000).lower()
 
-            power_gauge.add_metric(["voltage", part, system_critical], reading.get("volt", 0))
-            power_gauge.add_metric(["current", part, system_critical], reading.get("curr", 0))
-            power_gauge.add_metric(["power", part, system_critical], reading.get("power", 0))
-            power_gauge.add_metric(["avg_power", part, system_critical], reading.get("avg", 0))
-            power_gauge.add_metric(["warn_threshold", part, system_critical], reading.get("warn", 0))
+            voltage_gauge.add_metric([part, system_critical], reading.get("volt", 0))
+            current_gauge.add_metric([part, system_critical], reading.get("curr", 0))
+            power_gauge.add_metric([part, system_critical], reading.get("power", 0))
+            avg_power_gauge.add_metric([part, system_critical], reading.get("avg", 0))
+            warn_threshold_gauge.add_metric([part, system_critical], reading.get("warn", 0))
 
-        return [power_gauge]
+        return [
+            voltage_gauge,
+            current_gauge,
+            power_gauge,
+            avg_power_gauge,
+            warn_threshold_gauge
+        ]
 
     def __integrated_power_total(self):
         logging.debug("Starting __integrated_power_total() method")
@@ -229,16 +265,23 @@ class JetsonExporter(object):
         logging.debug(f"Total power data: {total_power}")
 
         power_gauge = GaugeMetricFamily(
-            name="integrated_power",
-            documentation="Power Statistics from internal power sensors (unit: mW)",
-            labels=["statistic", "machine_part", "system_critical"],
+            name="power_consumption_milliwatts",
+            documentation="Total system power consumption (instantaneous)",
+            labels=["statistic"],
             unit="mW"
         )
 
-        power_gauge.add_metric(["power", "total", "false"], total_power.get("power", 0))
-        power_gauge.add_metric(["avg_power", "total", "false"], total_power.get("avg", 0))
+        avg_power_gauge = GaugeMetricFamily(
+            name="power_average_milliwatts",
+            documentation="Total system average power consumption",
+            labels=["statistic"],
+            unit="mW"
+        )
 
-        return [power_gauge]
+        power_gauge.add_metric(["power"], total_power.get("power", 0))
+        avg_power_gauge.add_metric(["avg_power"], total_power.get("avg", 0))
+
+        return [power_gauge, avg_power_gauge]
 
     def __disk(self):
         logging.debug("Starting __disk() method")
