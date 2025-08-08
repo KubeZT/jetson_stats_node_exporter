@@ -208,47 +208,50 @@ class JetsonExporter(object):
         voltage_gauge = GaugeMetricFamily(
             name="power_voltage_millivolts",
             documentation="Voltage per power rail",
-            labels=["machine_part", "system_critical"],
+            labels=["machine_part", "online", "critical"],
             unit="mV"
         )
 
         current_gauge = GaugeMetricFamily(
             name="power_current_milliamps",
             documentation="Current per power rail",
-            labels=["machine_part", "system_critical"],
+            labels=["machine_part", "online", "critical"],
             unit="mA"
         )
 
         power_gauge = GaugeMetricFamily(
             name="power_consumption_milliwatts",
             documentation="Instantaneous power per power rail",
-            labels=["machine_part", "system_critical"],
+            labels=["machine_part", "online", "critical"],
             unit="mW"
         )
 
         avg_power_gauge = GaugeMetricFamily(
             name="power_average_milliwatts",
             documentation="Average power per power rail",
-            labels=["machine_part", "system_critical"],
+            labels=["machine_part", "online", "critical"],
             unit="mW"
         )
 
         warn_threshold_gauge = GaugeMetricFamily(
             name="power_warn_threshold_milliwatts",
             documentation="Warning threshold per power rail",
-            labels=["machine_part", "system_critical"],
+            labels=["machine_part", "online", "critical"],
             unit="mW"
         )
 
         for part, reading in power_data.items():
-            online = reading.get("online", False)
-            system_critical = str(not online or reading.get("warn", 0) > 80000).lower()
+            online_val = reading.get("online", False)
+            crit_val = reading.get("crit", 0)
 
-            voltage_gauge.add_metric([part, system_critical], reading.get("volt", 0))
-            current_gauge.add_metric([part, system_critical], reading.get("curr", 0))
-            power_gauge.add_metric([part, system_critical], reading.get("power", 0))
-            avg_power_gauge.add_metric([part, system_critical], reading.get("avg", 0))
-            warn_threshold_gauge.add_metric([part, system_critical], reading.get("warn", 0))
+            online_str = str(online_val).lower()
+            crit_str = str(bool(crit_val)).lower()
+
+            voltage_gauge.add_metric([part, online_str, crit_str], reading.get("volt", 0))
+            current_gauge.add_metric([part, online_str, crit_str], reading.get("curr", 0))
+            power_gauge.add_metric([part, online_str, crit_str], reading.get("power", 0))
+            avg_power_gauge.add_metric([part, online_str, crit_str], reading.get("avg", 0))
+            warn_threshold_gauge.add_metric([part, online_str, crit_str], reading.get("warn", 0))
 
         return [
             voltage_gauge,
