@@ -143,7 +143,7 @@ class JetsonExporter(object):
         ram_gauge.add_metric(["cached"], ram_data.get("cached", 0))
         ram_gauge.add_metric(["shared"], ram_data.get("shared", 0))
 
-        return ram_gauge
+        return [ram_gauge]
 
     def __swap(self):
         swap_gauge = GaugeMetricFamily(
@@ -157,7 +157,7 @@ class JetsonExporter(object):
         swap_gauge.add_metric(["used"], value=self.jetson.jtop_stats["memory"]["SWAP"]["used"])
         swap_gauge.add_metric(["cached"], value=self.jetson.jtop_stats["memory"]["SWAP"]["cached"])
 
-        return swap_gauge
+        return [swap_gauge]
 
     def __emc(self):
         emc_gauge = GaugeMetricFamily(
@@ -171,7 +171,7 @@ class JetsonExporter(object):
         emc_gauge.add_metric(["used"], value=self.jetson.jtop_stats["memory"]["EMC"]["max"])
         emc_gauge.add_metric(["cached"], value=self.jetson.jtop_stats["memory"]["EMC"]["min"])
 
-        return emc_gauge
+        return [emc_gauge]
 
     def __temperature(self):
         temperature_gauge = GaugeMetricFamily(
@@ -183,7 +183,7 @@ class JetsonExporter(object):
         for part, temp in self.jetson.jtop_stats['temperature'].items():
             temperature_gauge.add_metric([part], value=temp["temp"])
 
-        return temperature_gauge
+        return [temperature_gauge]
 
     def __integrated_power_machine_parts(self):
         power_gauge = GaugeMetricFamily(
@@ -199,7 +199,7 @@ class JetsonExporter(object):
             power_gauge.add_metric(["power", part], value=reading["power"])
             power_gauge.add_metric(["avg_power", part], value=reading["avg"])
 
-        return power_gauge
+        return [power_gauge]
 
     def __integrated_power_total(self):
         power_gauge = GaugeMetricFamily(
@@ -212,7 +212,7 @@ class JetsonExporter(object):
         power_gauge.add_metric(["power"], value=self.jetson.jtop_stats["power"]["tot"]["power"])
         power_gauge.add_metric(["avg_power"], value=self.jetson.jtop_stats["power"]["tot"]["avg"])
 
-        return power_gauge
+        return [power_gauge]
 
     def __disk(self):
         disk_gauge = GaugeMetricFamily(
@@ -228,7 +228,7 @@ class JetsonExporter(object):
                 disk_gauge.add_metric(["free"], value=disk_info["free"])
                 disk_gauge.add_metric(["percent"], value=disk_info["percent"])
 
-        return disk_gauge
+        return [disk_gauge]
 
     def __uptime(self):
         uptime_gauge = GaugeMetricFamily(
@@ -238,7 +238,7 @@ class JetsonExporter(object):
             unit="s"
         )
         uptime_gauge.add_metric(["alive"], value=self.jetson.jtop_stats["uptime"].total_seconds())
-        return uptime_gauge
+        return [uptime_gauge]
 
     def __network_bandwidth(self):
         network_gauge = GaugeMetricFamily(
@@ -251,20 +251,18 @@ class JetsonExporter(object):
             network_gauge.add_metric([iface, "rx"], stats["rx_bytes_per_sec"])
             network_gauge.add_metric([iface, "tx"], stats["tx_bytes_per_sec"])
 
-        return network_gauge
+        return [network_gauge]
 
     def collect(self):
         self.jetson.update()
-        for metric in self.__cpu():
-            yield metric
-        for metric in self.__gpu():
-            yield metric
-        yield self.__ram()
-        yield self.__swap()
-        yield self.__emc()
-        yield self.__temperature()
-        yield self.__integrated_power_machine_parts()
-        yield self.__integrated_power_total()
-        yield self.__disk()
-        yield self.__uptime()
-        yield self.__network_bandwidth()
+        yield from self.__cpu()
+        yield from self.__gpu()
+        yield from self.__ram()
+        yield from self.__swap()
+        yield from self.__emc()
+        yield from self.__temperature()
+        yield from self.__integrated_power_machine_parts()
+        yield from self.__integrated_power_total()
+        yield from self.__disk()
+        yield from self.__uptime()
+        yield from self.__network_bandwidth()
