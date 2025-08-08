@@ -88,48 +88,40 @@ class JetsonExporter(object):
         return metrics
 
     def __gpu(self):
+        logging.debug("Starting __gpu() method")
+
+        gpu = self.jetson.gpu.get("gpu", {})
+        status = gpu.get("status", {})
+        freq = gpu.get("freq", {})
+
+        # GPU Load
+        load = status.get("load", 0.0)
+        logging.debug(f"GPU Load: {load}")
+
         gpu_util_gauge = GaugeMetricFamily(
             name="gpu_utilization_percentage",
-            documentation="Flat GPU Utilization from Jetson Stats (top-level key)",
-            labels=["gpu"],
+            documentation="GPU load utilization percentage from jtop",
+            labels=["gpu"]
         )
+        gpu_util_gauge.add_metric(["integrated"], load)
 
-        value = self.jetson.jtop_stats.get("GPU", 0.0)
-        gpu_util_gauge.add_metric(["GPU0"], value)
-
-        return gpu_util_gauge
-
-    def __gpuram(self):
-        gpuram_gauge = GaugeMetricFamily(
-            name="gpuram",
-            documentation=f"Video Memory Statistics from Jetson Stats",
-            labels=["statistic", "nvidia_gpu"],
-            unit="kB"
+        # Frequency stats
+        gpu_freq = GaugeMetricFamily(
+            name="gpu_frequency_hz",
+            documentation="GPU frequency statistics",
+            labels=["gpu", "statistic"],
+            unit="Hz"
         )
+        gpu_freq.add_metric(["integrated", "cur"], freq.get("cur", 0))
+        gpu_freq.add_metric(["integrated", "min"], freq.get("min", 0))
+        gpu_freq.add_metric(["integrated", "max"], freq.get("max", 0))
 
-        gpu_names = self.jetson.jtop_stats["gpu"].keys()
+        # Optional: GPC[0] if present
+        gpc = freq.get("GPC", [])
+        if len(gpc) > 0:
+            gpu_freq.add_metric(["integrated", "gpc0"], gpc[0])
 
-        for gpu_name in gpu_names:
-            gpuram_gauge.add_metric([gpu_name, "mem"], value=self.jetson.jtop_stats["memory"]["RAM"]["shared"])
-
-        return gpuram_gauge
-
-    def __ram(self):
-        ram_gauge = GaugeMetricFamily(
-            name="ram",
-            documentation=f"Memory Statistics from Jetson Stats (unit: kB)",
-            labels=["statistic"],
-            unit="kB"
-        )
-
-        ram_gauge.add_metric(["total"], value=self.jetson.jtop_stats["memory"]["RAM"]["tot"])
-        ram_gauge.add_metric(["used"], value=self.jetson.jtop_stats["memory"]["RAM"]["used"])
-        ram_gauge.add_metric(["buffers"], value=self.jetson.jtop_stats["memory"]["RAM"]["buffers"])
-        ram_gauge.add_metric(["cached"], value=self.jetson.jtop_stats["memory"]["RAM"]["cached"])
-        ram_gauge.add_metric(["lfb"], value=self.jetson.jtop_stats["memory"]["RAM"]["lfb"])
-        ram_gauge.add_metric(["free"], value=self.jetson.jtop_stats["memory"]["RAM"]["free"])
-
-        return ram_gauge
+        return [gpu_util_gauge, gpu_freq]
 
     def __swap(self):
         swap_gauge = GaugeMetricFamily(
@@ -243,7 +235,8 @@ class JetsonExporter(object):
         self.jetson.update()
         for metric in self.__cpu():
             yield metric
-        yield self.__gpu()
+        for metric in self.__gpu():
+            yield metric
         yield self.__ram()
         yield self.__gpuram()
         yield self.__swap()
