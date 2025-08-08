@@ -153,9 +153,11 @@ class JetsonExporter(object):
             unit="kB"
         )
 
-        swap_gauge.add_metric(["total"], value=self.jetson.jtop_stats["memory"]["SWAP"]["tot"])
-        swap_gauge.add_metric(["used"], value=self.jetson.jtop_stats["memory"]["SWAP"]["used"])
-        swap_gauge.add_metric(["cached"], value=self.jetson.jtop_stats["memory"]["SWAP"]["cached"])
+        swap = self.jetson.jtop_stats.get("memory", {}).get("SWAP", {})
+
+        swap_gauge.add_metric(["total"], value=swap.get("tot", 0))
+        swap_gauge.add_metric(["used"], value=swap.get("used", 0))
+        swap_gauge.add_metric(["cached"], value=swap.get("cached", 0))
 
         return [swap_gauge]
 
@@ -167,9 +169,11 @@ class JetsonExporter(object):
             unit="Hz"
         )
 
-        emc_gauge.add_metric(["total"], value=self.jetson.jtop_stats["memory"]["EMC"]["cur"])
-        emc_gauge.add_metric(["used"], value=self.jetson.jtop_stats["memory"]["EMC"]["max"])
-        emc_gauge.add_metric(["cached"], value=self.jetson.jtop_stats["memory"]["EMC"]["min"])
+        emc = self.jetson.jtop_stats.get("memory", {}).get("EMC", {})
+
+        emc_gauge.add_metric(["total"], value=emc.get("cur", 0))
+        emc_gauge.add_metric(["used"], value=emc.get("max", 0))
+        emc_gauge.add_metric(["cached"], value=emc.get("min", 0))
 
         return [emc_gauge]
 
