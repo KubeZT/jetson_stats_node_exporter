@@ -325,6 +325,23 @@ class JetsonExporter(object):
 
         return [fan_speed_gauge, fan_rpm_gauge, fan_config_gauge]
 
+    def __nvpmodel(self):
+        from prometheus_client.core import GaugeMetricFamily
+
+        nvpmodel = self.jetson.jtop_stats.get("nvpmodel")
+        if not nvpmodel:
+            return []
+
+        nvpmodel_gauge = GaugeMetricFamily(
+            name="nvpmodel_info",
+            documentation="Current NVPModel power mode",
+            labels=["model"]
+        )
+
+        nvpmodel_gauge.add_metric([str(nvpmodel)], 1)
+
+        return [nvpmodel_gauge]
+
     def __disk(self):
         logging.debug("Starting __disk() method")
 
@@ -363,6 +380,22 @@ class JetsonExporter(object):
 
         return [uptime_gauge]
 
+    def __jetson_clocks(self):
+        logging.debug("Starting __jetson_clocks() method")
+
+        clocks_enabled = self.jetson.jtop_stats.get("jetson_clocks", False)
+        logging.debug(f"Jetson clocks enabled: {clocks_enabled}")
+
+        clocks_gauge = GaugeMetricFamily(
+            name="jetson_clocks",
+            documentation="Status of Jetson Clocks override (True if performance mode enabled)",
+            labels=["enabled"]
+        )
+
+        clocks_gauge.add_metric([str(clocks_enabled).lower()], 1.0)
+
+        return [clocks_gauge]
+
     def __network_bandwidth(self):
         network_gauge = GaugeMetricFamily(
             name="network_bandwidth_bytes_per_second",
@@ -387,6 +420,8 @@ class JetsonExporter(object):
         yield from self.__integrated_power_machine_parts()
         yield from self.__integrated_power_total()
         yield from self.__fan()
+        yield from self.__nvpmodel()
         yield from self.__disk()
         yield from self.__uptime()
+        yield from self.__jetson_clocks()
         yield from self.__network_bandwidth()
