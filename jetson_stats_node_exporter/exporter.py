@@ -382,77 +382,137 @@ class JetsonExporter(object):
 
     def __stats(self):
         logging.debug("Starting __stats() method")
-
         stats_data = self.jetson.jtop_stats.get("stats", {})
-        logging.debug(f"Stats data: {pprint.pformat(stats_data)}")
 
-        cpu_gauge = GaugeMetricFamily(
+        stats_cpu_gauge = GaugeMetricFamily(
             name="stats_cpu_utilization_percent",
             documentation="Per-CPU core utilization or 0 if OFF",
             labels=["core"]
         )
 
-        engine_status_gauge = GaugeMetricFamily(
-            name="stats_engine_status",
-            documentation="ON/OFF status for Jetson engines (1=ON, 0=OFF)",
-            labels=["engine"]
-        )
-
-        usage_gauge = GaugeMetricFamily(
+        stats_usage_gauge = GaugeMetricFamily(
             name="stats_resource_usage_percent",
             documentation="Usage percent for RAM, SWAP, GPU, EMC",
             labels=["resource"]
         )
 
-        fan_pwm_gauge = GaugeMetricFamily(
-            name="fan_pwm_percent",
-            documentation="Fan PWM speed from jetson.stats",
+        stats_engine_gauge = GaugeMetricFamily(
+            name="stats_engine_status",
+            documentation="ON/OFF status for Jetson engines (1=ON, 0=OFF)",
+            labels=["engine"]
+        )
+
+        stats_fan_gauge = GaugeMetricFamily(
+            name="stats_fan_pwm_percent",
+            documentation="PWM value for Jetson cooling fans",
             labels=["fan"]
         )
 
-        temp_gauge = GaugeMetricFamily(
-            name="temperature_celsius",
+        stats_temp_gauge = GaugeMetricFamily(
+            name="stats_temperature_celsius",
             documentation="Temperature sensors from Jetson stats",
             labels=["sensor"],
             unit="celsius"
         )
 
-        for key, val in stats_data.items():
-            if key.startswith("Temp "):
-                sensor = key[5:].lower().replace(" ", "_")
-                temp_gauge.add_metric([sensor], float(val))
-
-        power_gauge = GaugeMetricFamily(
-            name="power_milliwatts",
+        stats_power_gauge = GaugeMetricFamily(
+            name="stats_power_milliwatts",
             documentation="Per-rail power consumption in milliwatts",
             labels=["rail"],
             unit="mW"
         )
 
         for key, val in stats_data.items():
-            if key.startswith("Power "):
-                rail = key[6:]
-                power_gauge.add_metric([rail], float(val))
-
-        for key, val in stats_data.items():
-            if key.startswith("CPU") and key[3:].isdigit():
+            # CPU utilization (CPU1 - CPU12)
+            if key.startswith("CPU"):
                 core = key[3:]
-                if isinstance(val, (int, float)):
-                    cpu_gauge.add_metric([core], val)
-                elif str(val).upper() == "OFF":
-                    cpu_gauge.add_metric([core], 0)
+                try:
+                    stats_cpu_gauge.add_metric([core], float(val))
+                except ValueError:
+                    stats_cpu_gauge.add_metric([core], 0.0)
 
-            elif key in {"RAM", "SWAP", "GPU", "EMC"}:
-                usage_gauge.add_metric([key], float(val))
+            # RAM, SWAP, EMC, GPU usage percentages
+            elif key in ("RAM", "SWAP", "EMC", "GPU"):
+                stats_usage_gauge.add_metric([key], float(val))
 
+            # Engines ON/OFF (exclude jetson_clocks)
+            elif key in (
+                "APE", "DLA0_CORE", "DLA0_FALCON", "DLA1_CORE", "DLA1_FALCON",
+                "NVDEC", "NVENC", "NVJPG", "NVJPG1", "OFA", "PVA0_CPU_AXI",
+                "PVA0_VPS", "SE", "VIC"
+            ):
+                state = 0.0 if val == "OFF" else 1.0
+                stats_engine_gauge.add_metric([key], state)
+
+            # Fan PWM
             elif key.startswith("Fan "):
-                fan_name = key[4:]
-                fan_pwm_gauge.add_metric([fan_name], float(val))
+                fan = key[4:].lower().replace(" ", "_")
+                stats_fan_gauge.add_metric([fan], float(val))
 
-            elif isinstance(val, str) and val.upper() in {"ON", "OFF"}:
-                engine_status_gauge.add_metric([key], 1.0 if val.upper() == "ON" else 0.0)
+            # Temperature Sensors
+            elif key.startswith("Temp "):
+                sensor = key[5:].lower().replace(" ", "_")
+                stats_temp_gauge.add_metric([sensor], float(val))
 
-        return [cpu_gauge, usage_gauge, engine_status_gauge, fan_pwm_gauge, temp_gauge, power_gauge]
+            # Power Rails
+            elif key.startswith("Power "):
+                rail = key[6:]
+                stats_power_gauge.add_metric([rail], float(val))
+
+        return [
+            stats_cpu_gauge,
+            stats_usage_gauge,
+            stats_engine_gauge,
+            stats_fan_gauge,
+            stats_temp_gauge,
+            stats_power_gauge
+        ]
+
+    def __processes(self):
+        logging.debug("Starting __processes() method")
+
+        processes = self.jetson.jtop_stats.get("processes", [])
+        logging.debug(f"Retrieved {len(processes)} processes")
+
+        process_gpu_gauge = GaugeMetricFamily(
+            name="process_gpu_usage_percent",
+            documentation="Per-process GPU usage percent from Jetson stats",
+            labels=["pid", "user", "name"]
+        )
+
+        process_mem_gauge = GaugeMetricFamily(
+            name="process_memory_usage_kb",
+            documentation="Per-process memory usage in KB from Jetson stats",
+            labels=["pid", "user", "name"]
+        )
+
+        process_rss_gauge = GaugeMetricFamily(
+            name="process_memory_rss_kb",
+            documentation="Per-process resident memory (RSS) in KB from Jetson stats",
+            labels=["pid", "user", "name"]
+        )
+
+        for proc in processes:
+            try:
+                pid = str(proc[0])
+                user = str(proc[1])
+                name = str(proc[-1])
+                gpu = float(proc[6])
+                mem = float(proc[7])
+                rss = float(proc[8])
+            except (IndexError, ValueError, TypeError) as e:
+                logging.warning(f"Skipping process row due to parse error: {e}")
+                continue
+
+            process_gpu_gauge.add_metric([pid, user, name], gpu)
+            process_mem_gauge.add_metric([pid, user, name], mem)
+            process_rss_gauge.add_metric([pid, user, name], rss)
+
+        return [
+            process_gpu_gauge,
+            process_mem_gauge,
+            process_rss_gauge
+        ]
 
     def __jetson_clocks(self):
         logging.debug("Starting __jetson_clocks() method")
@@ -498,5 +558,6 @@ class JetsonExporter(object):
         yield from self.__disk()
         yield from self.__uptime()
         yield from self.__stats()
+        yield from self.__processes()
         yield from self.__jetson_clocks()
         yield from self.__network_bandwidth()
