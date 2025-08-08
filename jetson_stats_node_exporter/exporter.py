@@ -42,9 +42,9 @@ class JetsonExporter(object):
             unit="Hz"
         )
 
-        cpu_usage = GaugeMetricFamily(
-            name="cpu_percent",
-            documentation="CPU usage percentage per core and total",
+        cpu_utilization = GaugeMetricFamily(
+            name="cpu_utilization_percent",
+            documentation="CPU usage percent per core and total",
             labels=["core", "mode"],
             unit="percent"
         )
@@ -62,20 +62,20 @@ class JetsonExporter(object):
             cpu_gauge.add_metric([str(core_number), "min"], freq.get("min", 0))
             cpu_gauge.add_metric([str(core_number), "max"], freq.get("max", 0))
 
-            cpu_usage.add_metric([str(core_number), "user"], core_data.get("user", 0))
-            cpu_usage.add_metric([str(core_number), "nice"], core_data.get("nice", 0))
-            cpu_usage.add_metric([str(core_number), "system"], core_data.get("system", 0))
-            cpu_usage.add_metric([str(core_number), "idle"], core_data.get("idle", 0))
+            cpu_utilization.add_metric([str(core_number), "user"], core_data.get("user", 0))
+            cpu_utilization.add_metric([str(core_number), "nice"], core_data.get("nice", 0))
+            cpu_utilization.add_metric([str(core_number), "system"], core_data.get("system", 0))
+            cpu_utilization.add_metric([str(core_number), "idle"], core_data.get("idle", 0))
 
         total_data = cpu_data.get("total", {})
         logging.debug(f"Total CPU data: {total_data}")
         if total_data:
-            cpu_usage.add_metric(["total", "user"], total_data.get("user", 0))
-            cpu_usage.add_metric(["total", "nice"], total_data.get("nice", 0))
-            cpu_usage.add_metric(["total", "system"], total_data.get("system", 0))
-            cpu_usage.add_metric(["total", "idle"], total_data.get("idle", 0))
+            cpu_utilization.add_metric(["total", "user"], total_data.get("user", 0))
+            cpu_utilization.add_metric(["total", "nice"], total_data.get("nice", 0))
+            cpu_utilization.add_metric(["total", "system"], total_data.get("system", 0))
+            cpu_utilization.add_metric(["total", "idle"], total_data.get("idle", 0))
 
-        metrics = [cpu_gauge, cpu_usage]
+        metrics = [cpu_gauge, cpu_utilization]
 
         logging.debug(f"__cpu() returning raw metrics: {metrics}")
         for i, metric in enumerate(metrics):
