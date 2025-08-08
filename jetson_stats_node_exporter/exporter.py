@@ -380,6 +380,80 @@ class JetsonExporter(object):
 
         return [uptime_gauge]
 
+    def __stats(self):
+        logging.debug("Starting __stats() method")
+
+        stats_data = self.jetson.jtop_stats.get("stats", {})
+        logging.debug(f"Stats data: {pprint.pformat(stats_data)}")
+
+        cpu_gauge = GaugeMetricFamily(
+            name="stats_cpu_utilization_percent",
+            documentation="Per-CPU core utilization or 0 if OFF",
+            labels=["core"]
+        )
+
+        engine_status_gauge = GaugeMetricFamily(
+            name="stats_engine_status",
+            documentation="ON/OFF status for Jetson engines (1=ON, 0=OFF)",
+            labels=["engine"]
+        )
+
+        usage_gauge = GaugeMetricFamily(
+            name="stats_resource_usage_percent",
+            documentation="Usage percent for RAM, SWAP, GPU, EMC",
+            labels=["resource"]
+        )
+
+        fan_pwm_gauge = GaugeMetricFamily(
+            name="fan_pwm_percent",
+            documentation="Fan PWM speed from jetson.stats",
+            labels=["fan"]
+        )
+
+        temp_gauge = GaugeMetricFamily(
+            name="temperature_celsius",
+            documentation="Temperature sensors from Jetson stats",
+            labels=["sensor"],
+            unit="celsius"
+        )
+
+        for key, val in stats_data.items():
+            if key.startswith("Temp "):
+                sensor = key[5:].lower().replace(" ", "_")
+                temp_gauge.add_metric([sensor], float(val))
+
+        power_gauge = GaugeMetricFamily(
+            name="power_milliwatts",
+            documentation="Per-rail power consumption in milliwatts",
+            labels=["rail"],
+            unit="mW"
+        )
+
+        for key, val in stats_data.items():
+            if key.startswith("Power "):
+                rail = key[6:]
+                power_gauge.add_metric([rail], float(val))
+
+        for key, val in stats_data.items():
+            if key.startswith("CPU") and key[3:].isdigit():
+                core = key[3:]
+                if isinstance(val, (int, float)):
+                    cpu_gauge.add_metric([core], val)
+                elif str(val).upper() == "OFF":
+                    cpu_gauge.add_metric([core], 0)
+
+            elif key in {"RAM", "SWAP", "GPU", "EMC"}:
+                usage_gauge.add_metric([key], float(val))
+
+            elif key.startswith("Fan "):
+                fan_name = key[4:]
+                fan_pwm_gauge.add_metric([fan_name], float(val))
+
+            elif isinstance(val, str) and val.upper() in {"ON", "OFF"}:
+                engine_status_gauge.add_metric([key], 1.0 if val.upper() == "ON" else 0.0)
+
+        return [cpu_gauge, usage_gauge, engine_status_gauge, fan_pwm_gauge, temp_gauge, power_gauge]
+
     def __jetson_clocks(self):
         logging.debug("Starting __jetson_clocks() method")
 
@@ -423,5 +497,6 @@ class JetsonExporter(object):
         yield from self.__nvpmodel()
         yield from self.__disk()
         yield from self.__uptime()
+        yield from self.__stats()
         yield from self.__jetson_clocks()
         yield from self.__network_bandwidth()
