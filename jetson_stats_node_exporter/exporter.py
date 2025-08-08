@@ -29,7 +29,7 @@ class JetsonExporter(object):
     def __init__(self, update_period):
         self.jetson = Jetson(update_period)
         self.logger = factory(__name__)
-        self.name = socket.gethostname().split(".")[0]
+        self.hostname = socket.gethostname().split(".")[0]
 
     def __cpu(self):
         logging.debug("Starting __cpu() method")
@@ -39,14 +39,14 @@ class JetsonExporter(object):
         cpu_gauge = GaugeMetricFamily(
             name="cpu_Hz",
             documentation="CPU frequency statistics per core",
-            labels=["core", "statistic"],
+            labels=["hostname", "core", "statistic"],
             unit="Hz"
         )
 
         cpu_utilization = GaugeMetricFamily(
             name="cpu_utilization_percent",
             documentation="CPU usage percent per core and total",
-            labels=["core", "mode"],
+            labels=["hostname", "core", "mode"],
             unit="percent"
         )
 
@@ -59,22 +59,22 @@ class JetsonExporter(object):
                 continue
 
             freq = core_data.get("freq", {})
-            cpu_gauge.add_metric([str(core_number), "cur"], freq.get("cur", 0))
-            cpu_gauge.add_metric([str(core_number), "min"], freq.get("min", 0))
-            cpu_gauge.add_metric([str(core_number), "max"], freq.get("max", 0))
+            cpu_gauge.add_metric([self.hostname, str(core_number), "cur"], freq.get("cur", 0))
+            cpu_gauge.add_metric([self.hostname, str(core_number), "min"], freq.get("min", 0))
+            cpu_gauge.add_metric([self.hostname, str(core_number), "max"], freq.get("max", 0))
 
-            cpu_utilization.add_metric([str(core_number), "user"], core_data.get("user", 0))
-            cpu_utilization.add_metric([str(core_number), "nice"], core_data.get("nice", 0))
-            cpu_utilization.add_metric([str(core_number), "system"], core_data.get("system", 0))
-            cpu_utilization.add_metric([str(core_number), "idle"], core_data.get("idle", 0))
+            cpu_utilization.add_metric([self.hostname, str(core_number), "user"], core_data.get("user", 0))
+            cpu_utilization.add_metric([self.hostname, str(core_number), "nice"], core_data.get("nice", 0))
+            cpu_utilization.add_metric([self.hostname, str(core_number), "system"], core_data.get("system", 0))
+            cpu_utilization.add_metric([self.hostname, str(core_number), "idle"], core_data.get("idle", 0))
 
         total_data = cpu_data.get("total", {})
         logging.debug(f"Total CPU data: {total_data}")
         if total_data:
-            cpu_utilization.add_metric(["total", "user"], total_data.get("user", 0))
-            cpu_utilization.add_metric(["total", "nice"], total_data.get("nice", 0))
-            cpu_utilization.add_metric(["total", "system"], total_data.get("system", 0))
-            cpu_utilization.add_metric(["total", "idle"], total_data.get("idle", 0))
+            cpu_utilization.add_metric([self.hostname, "total", "user"], total_data.get("user", 0))
+            cpu_utilization.add_metric([self.hostname, "total", "nice"], total_data.get("nice", 0))
+            cpu_utilization.add_metric([self.hostname, "total", "system"], total_data.get("system", 0))
+            cpu_utilization.add_metric([self.hostname, "total", "idle"], total_data.get("idle", 0))
 
         metrics = [cpu_gauge, cpu_utilization]
 
@@ -102,26 +102,26 @@ class JetsonExporter(object):
         gpu_util_gauge = GaugeMetricFamily(
             name="gpu_utilization_percent",
             documentation="GPU load utilization percent from jtop",
-            labels=["gpu"],
+            labels=["hostname", "gpu"],
             unit="percent"
         )
-        gpu_util_gauge.add_metric(["integrated"], load)
+        gpu_util_gauge.add_metric([self.hostname, "integrated"], load)
 
         # Frequency stats
         gpu_freq = GaugeMetricFamily(
             name="gpu_frequency_hz",
             documentation="GPU frequency statistics",
-            labels=["gpu", "statistic"],
+            labels=["hostname", "gpu", "statistic"],
             unit="Hz"
         )
-        gpu_freq.add_metric(["integrated", "cur"], freq.get("cur", 0))
-        gpu_freq.add_metric(["integrated", "min"], freq.get("min", 0))
-        gpu_freq.add_metric(["integrated", "max"], freq.get("max", 0))
+        gpu_freq.add_metric([self.hostname, "integrated", "cur"], freq.get("cur", 0))
+        gpu_freq.add_metric([self.hostname, "integrated", "min"], freq.get("min", 0))
+        gpu_freq.add_metric([self.hostname, "integrated", "max"], freq.get("max", 0))
 
         # Optional: GPC[0] if present
         gpc = freq.get("GPC", [])
         if len(gpc) > 0:
-            gpu_freq.add_metric(["integrated", "gpc0"], gpc[0])
+            gpu_freq.add_metric([self.hostname, "integrated", "gpc0"], gpc[0])
 
         return [gpu_util_gauge, gpu_freq]
 
@@ -134,16 +134,16 @@ class JetsonExporter(object):
         ram_gauge = GaugeMetricFamily(
             name="ram",
             documentation="Memory Statistics from Jetson Stats (unit: kB)",
-            labels=["statistic"],
+            labels=["hostname", "statistic"],
             unit="kB"
         )
 
-        ram_gauge.add_metric(["total"], ram_data.get("tot", 0))
-        ram_gauge.add_metric(["used"], ram_data.get("used", 0))
-        ram_gauge.add_metric(["free"], ram_data.get("free", 0))
-        ram_gauge.add_metric(["buffers"], ram_data.get("buffers", 0))
-        ram_gauge.add_metric(["cached"], ram_data.get("cached", 0))
-        ram_gauge.add_metric(["shared"], ram_data.get("shared", 0))
+        ram_gauge.add_metric([self.hostname, "total"], ram_data.get("tot", 0))
+        ram_gauge.add_metric([self.hostname, "used"], ram_data.get("used", 0))
+        ram_gauge.add_metric([self.hostname, "free"], ram_data.get("free", 0))
+        ram_gauge.add_metric([self.hostname, "buffers"], ram_data.get("buffers", 0))
+        ram_gauge.add_metric([self.hostname, "cached"], ram_data.get("cached", 0))
+        ram_gauge.add_metric([self.hostname, "shared"], ram_data.get("shared", 0))
 
         return [ram_gauge]
 
@@ -151,15 +151,15 @@ class JetsonExporter(object):
         swap_gauge = GaugeMetricFamily(
             name="swap",
             documentation=f"Swap Statistics from Jetson Stats",
-            labels=["statistic"],
+            labels=["hostname", "statistic"],
             unit="kB"
         )
 
         swap = self.jetson.jtop_stats.get("memory", {}).get("SWAP", {})
 
-        swap_gauge.add_metric(["total"], value=swap.get("tot", 0))
-        swap_gauge.add_metric(["used"], value=swap.get("used", 0))
-        swap_gauge.add_metric(["cached"], value=swap.get("cached", 0))
+        swap_gauge.add_metric([self.hostname, "total"], value=swap.get("tot", 0))
+        swap_gauge.add_metric([self.hostname, "used"], value=swap.get("used", 0))
+        swap_gauge.add_metric([self.hostname, "cached"], value=swap.get("cached", 0))
 
         return [swap_gauge]
 
@@ -167,15 +167,15 @@ class JetsonExporter(object):
         emc_gauge = GaugeMetricFamily(
             name="emc",
             documentation=f"EMC Statistics from Jetson Stats",
-            labels=["statistic"],
+            labels=["hostname", "statistic"],
             unit="Hz"
         )
 
         emc = self.jetson.jtop_stats.get("memory", {}).get("EMC", {})
 
-        emc_gauge.add_metric(["cur"], value=emc.get("cur", 0))
-        emc_gauge.add_metric(["max"], value=emc.get("max", 0))
-        emc_gauge.add_metric(["min"], value=emc.get("min", 0))
+        emc_gauge.add_metric([self.hostname, "cur"], value=emc.get("cur", 0))
+        emc_gauge.add_metric([self.hostname, "max"], value=emc.get("max", 0))
+        emc_gauge.add_metric([self.hostname, "min"], value=emc.get("min", 0))
 
         return [emc_gauge]
 
@@ -188,7 +188,7 @@ class JetsonExporter(object):
         temperature_gauge = GaugeMetricFamily(
             name="temperature",
             documentation="Temperature Statistics from Jetson Stats (unit: °C)",
-            labels=["statistic", "machine_part", "system_critical"],
+            labels=["hostname", "statistic", "machine_part", "system_critical"],
             unit="C"
         )
 
@@ -196,7 +196,7 @@ class JetsonExporter(object):
             temp = temp_info.get("temp", -999)
             online = temp_info.get("online", False)
             system_critical = str(not online or temp <= -255).lower()
-            temperature_gauge.add_metric(["temp", part, system_critical], temp)
+            temperature_gauge.add_metric([self.hostname, "temp", part, system_critical], temp)
 
         return [temperature_gauge]
 
@@ -209,35 +209,35 @@ class JetsonExporter(object):
         voltage_gauge = GaugeMetricFamily(
             name="power_voltage_millivolts",
             documentation="Voltage per power rail",
-            labels=["machine_part", "online", "critical"],
+            labels=["hostname", "machine_part", "online", "critical"],
             unit="mV"
         )
 
         current_gauge = GaugeMetricFamily(
             name="power_current_milliamps",
             documentation="Current per power rail",
-            labels=["machine_part", "online", "critical"],
+            labels=["hostname", "machine_part", "online", "critical"],
             unit="mA"
         )
 
         power_gauge = GaugeMetricFamily(
             name="power_consumption_milliwatts",
             documentation="Instantaneous power per power rail",
-            labels=["machine_part", "online", "critical"],
+            labels=["hostname", "machine_part", "online", "critical"],
             unit="mW"
         )
 
         avg_power_gauge = GaugeMetricFamily(
             name="power_average_milliwatts",
             documentation="Average power per power rail",
-            labels=["machine_part", "online", "critical"],
+            labels=["hostname", "machine_part", "online", "critical"],
             unit="mW"
         )
 
         warn_threshold_gauge = GaugeMetricFamily(
             name="power_warn_threshold_milliwatts",
             documentation="Warning threshold per power rail",
-            labels=["machine_part", "online", "critical"],
+            labels=["hostname", "machine_part", "online", "critical"],
             unit="mW"
         )
 
@@ -248,11 +248,11 @@ class JetsonExporter(object):
             online_str = str(online_val).lower()
             crit_str = str(bool(crit_val)).lower()
 
-            voltage_gauge.add_metric([part, online_str, crit_str], reading.get("volt", 0))
-            current_gauge.add_metric([part, online_str, crit_str], reading.get("curr", 0))
-            power_gauge.add_metric([part, online_str, crit_str], reading.get("power", 0))
-            avg_power_gauge.add_metric([part, online_str, crit_str], reading.get("avg", 0))
-            warn_threshold_gauge.add_metric([part, online_str, crit_str], reading.get("warn", 0))
+            voltage_gauge.add_metric([self.hostname, part, online_str, crit_str], reading.get("volt", 0))
+            current_gauge.add_metric([self.hostname, part, online_str, crit_str], reading.get("curr", 0))
+            power_gauge.add_metric([self.hostname, part, online_str, crit_str], reading.get("power", 0))
+            avg_power_gauge.add_metric([self.hostname, part, online_str, crit_str], reading.get("avg", 0))
+            warn_threshold_gauge.add_metric([self.hostname, part, online_str, crit_str], reading.get("warn", 0))
 
         return [
             voltage_gauge,
@@ -271,19 +271,19 @@ class JetsonExporter(object):
         power_gauge = GaugeMetricFamily(
             name="power_consumption_milliwatts",
             documentation="Total system power consumption (instantaneous)",
-            labels=["statistic"],
+            labels=["hostname", "statistic"],
             unit="mW"
         )
 
         avg_power_gauge = GaugeMetricFamily(
             name="power_average_milliwatts",
             documentation="Total system average power consumption",
-            labels=["statistic"],
+            labels=["hostname", "statistic"],
             unit="mW"
         )
 
-        power_gauge.add_metric(["power"], total_power.get("power", 0))
-        avg_power_gauge.add_metric(["avg_power"], total_power.get("avg", 0))
+        power_gauge.add_metric([self.hostname, "power"], total_power.get("power", 0))
+        avg_power_gauge.add_metric([self.hostname, "avg_power"], total_power.get("avg", 0))
 
         return [power_gauge, avg_power_gauge]
 
@@ -296,20 +296,20 @@ class JetsonExporter(object):
         fan_speed_gauge = GaugeMetricFamily(
             name="fan_speed_percent",
             documentation="Fan PWM speed (percentage)",
-            labels=["fan"],
+            labels=["hostname", "fan"],
             unit="percent"
         )
 
         fan_rpm_gauge = GaugeMetricFamily(
             name="fan_rpm",
             documentation="Fan speed in RPM",
-            labels=["fan"]
+            labels=["hostname", "fan"]
         )
 
         fan_config_gauge = GaugeMetricFamily(
             name="fan_config_info",
             documentation="Fan configuration info (profile, governor, control)",
-            labels=["fan", "profile", "governor", "control"]
+            labels=["hostname", "fan", "profile", "governor", "control"]
         )
 
         fan_name = "pwmfan"
@@ -320,9 +320,9 @@ class JetsonExporter(object):
         governor = fan_data.get("governor", "unknown")
         control = fan_data.get("control", "unknown")
 
-        fan_speed_gauge.add_metric([fan_name], speed)
-        fan_rpm_gauge.add_metric([fan_name], rpm)
-        fan_config_gauge.add_metric([fan_name, profile, governor, control], 1)
+        fan_speed_gauge.add_metric([self.hostname, fan_name], speed)
+        fan_rpm_gauge.add_metric([self.hostname, fan_name], rpm)
+        fan_config_gauge.add_metric([self.hostname, fan_name, profile, governor, control], 1)
 
         return [fan_speed_gauge, fan_rpm_gauge, fan_config_gauge]
 
@@ -336,10 +336,10 @@ class JetsonExporter(object):
         nvpmodel_gauge = GaugeMetricFamily(
             name="nvpmodel_info",
             documentation="Current NVPModel power mode",
-            labels=["model"]
+            labels=["hostname", "model"]
         )
 
-        nvpmodel_gauge.add_metric([str(nvpmodel)], 1)
+        nvpmodel_gauge.add_metric([self.hostname, str(nvpmodel)], 1)
 
         return [nvpmodel_gauge]
 
@@ -352,14 +352,14 @@ class JetsonExporter(object):
         disk_gauge = GaugeMetricFamily(
             name="disk",
             documentation=f"Local Storage Statistics from Jetson Stats (unit: {self.jetson.disk_units})",
-            labels=["statistic"],
+            labels=["hostname", "statistic"],
             unit="GB"
         )
 
-        disk_gauge.add_metric(["total"], value=disk_data.get("total", 0))
-        disk_gauge.add_metric(["used"], value=disk_data.get("used", 0))
-        disk_gauge.add_metric(["available"], value=disk_data.get("available", 0))
-        disk_gauge.add_metric(["available_no_root"], value=disk_data.get("available_no_root", 0))
+        disk_gauge.add_metric([self.hostname, "total"], value=disk_data.get("total", 0))
+        disk_gauge.add_metric([self.hostname, "used"], value=disk_data.get("used", 0))
+        disk_gauge.add_metric([self.hostname, "available"], value=disk_data.get("available", 0))
+        disk_gauge.add_metric([self.hostname, "available_no_root"], value=disk_data.get("available_no_root", 0))
 
         return [disk_gauge]
 
@@ -372,12 +372,12 @@ class JetsonExporter(object):
         uptime_gauge = GaugeMetricFamily(
             name="uptime",
             documentation="Machine Uptime Statistics from Jetson Stats",
-            labels=["statistic"],
+            labels=["hostname", "statistic"],
             unit="s"
         )
 
         uptime_seconds = uptime.total_seconds() if uptime else 0
-        uptime_gauge.add_metric(["alive"], value=uptime_seconds)
+        uptime_gauge.add_metric([self.hostname, "alive"], value=uptime_seconds)
 
         return [uptime_gauge]
 
@@ -388,38 +388,38 @@ class JetsonExporter(object):
         stats_cpu_gauge = GaugeMetricFamily(
             name="stats_cpu_utilization_percent",
             documentation="Per-CPU core utilization or 0 if OFF",
-            labels=["core"]
+            labels=["hostname", "core"]
         )
 
         stats_usage_gauge = GaugeMetricFamily(
             name="stats_resource_usage_percent",
             documentation="Usage percent for RAM, SWAP, GPU, EMC",
-            labels=["resource"]
+            labels=["hostname", "resource"]
         )
 
         stats_engine_gauge = GaugeMetricFamily(
             name="stats_engine_status",
             documentation="ON/OFF status for Jetson engines (1=ON, 0=OFF)",
-            labels=["engine"]
+            labels=["hostname", "engine"]
         )
 
         stats_fan_gauge = GaugeMetricFamily(
             name="stats_fan_pwm_percent",
             documentation="PWM value for Jetson cooling fans",
-            labels=["fan"]
+            labels=["hostname", "fan"]
         )
 
         stats_temp_gauge = GaugeMetricFamily(
             name="stats_temperature_celsius",
             documentation="Temperature sensors from Jetson stats",
-            labels=["sensor"],
+            labels=["hostname", "sensor"],
             unit="celsius"
         )
 
         stats_power_gauge = GaugeMetricFamily(
             name="stats_power_milliwatts",
             documentation="Per-rail power consumption in milliwatts",
-            labels=["rail"],
+            labels=["hostname", "rail"],
             unit="mW"
         )
 
@@ -428,13 +428,13 @@ class JetsonExporter(object):
             if key.startswith("CPU"):
                 core = key[3:]
                 try:
-                    stats_cpu_gauge.add_metric([core], float(val))
+                    stats_cpu_gauge.add_metric([self.hostname, core], float(val))
                 except ValueError:
-                    stats_cpu_gauge.add_metric([core], 0.0)
+                    stats_cpu_gauge.add_metric([self.hostname, core], 0.0)
 
             # RAM, SWAP, EMC, GPU usage percentages
             elif key in ("RAM", "SWAP", "EMC", "GPU"):
-                stats_usage_gauge.add_metric([key], float(val))
+                stats_usage_gauge.add_metric([self.hostname, key], float(val))
 
             # Engines ON/OFF (exclude jetson_clocks)
             elif key in (
@@ -443,22 +443,22 @@ class JetsonExporter(object):
                 "PVA0_VPS", "SE", "VIC"
             ):
                 state = 0.0 if val == "OFF" else 1.0
-                stats_engine_gauge.add_metric([key], state)
+                stats_engine_gauge.add_metric([self.hostname, key], state)
 
             # Fan PWM
             elif key.startswith("Fan "):
                 fan = key[4:].lower().replace(" ", "_")
-                stats_fan_gauge.add_metric([fan], float(val))
+                stats_fan_gauge.add_metric([self.hostname, fan], float(val))
 
             # Temperature Sensors
             elif key.startswith("Temp "):
                 sensor = key[5:].lower().replace(" ", "_")
-                stats_temp_gauge.add_metric([sensor], float(val))
+                stats_temp_gauge.add_metric([self.hostname, sensor], float(val))
 
             # Power Rails
             elif key.startswith("Power "):
                 rail = key[6:]
-                stats_power_gauge.add_metric([rail], float(val))
+                stats_power_gauge.add_metric([self.hostname, rail], float(val))
 
         return [
             stats_cpu_gauge,
@@ -478,19 +478,19 @@ class JetsonExporter(object):
         process_gpu_gauge = GaugeMetricFamily(
             name="process_gpu_usage_percent",
             documentation="Per-process GPU usage percent from Jetson stats",
-            labels=["pid", "user", "name"]
+            labels=["hostname", "pid", "user", "name"]
         )
 
         process_mem_gauge = GaugeMetricFamily(
             name="process_memory_usage_kb",
             documentation="Per-process memory usage in KB from Jetson stats",
-            labels=["pid", "user", "name"]
+            labels=["hostname", "pid", "user", "name"]
         )
 
         process_rss_gauge = GaugeMetricFamily(
             name="process_memory_rss_kb",
             documentation="Per-process resident memory (RSS) in KB from Jetson stats",
-            labels=["pid", "user", "name"]
+            labels=["hostname", "pid", "user", "name"]
         )
 
         for proc in processes:
@@ -505,9 +505,9 @@ class JetsonExporter(object):
                 logging.warning(f"Skipping process row due to parse error: {e}")
                 continue
 
-            process_gpu_gauge.add_metric([pid, user, name], gpu)
-            process_mem_gauge.add_metric([pid, user, name], mem)
-            process_rss_gauge.add_metric([pid, user, name], rss)
+            process_gpu_gauge.add_metric([self.hostname, pid, user, name], gpu)
+            process_mem_gauge.add_metric([self.hostname, pid, user, name], mem)
+            process_rss_gauge.add_metric([self.hostname, pid, user, name], rss)
 
         return [
             process_gpu_gauge,
@@ -524,10 +524,10 @@ class JetsonExporter(object):
         clocks_gauge = GaugeMetricFamily(
             name="jetson_clocks",
             documentation="Status of Jetson Clocks override (True if performance mode enabled)",
-            labels=["enabled"]
+            labels=["hostname", "enabled"]
         )
 
-        clocks_gauge.add_metric([str(clocks_enabled).lower()], 1.0)
+        clocks_gauge.add_metric([self.hostname, str(clocks_enabled).lower()], 1.0)
 
         return [clocks_gauge]
 
@@ -535,12 +535,12 @@ class JetsonExporter(object):
         network_gauge = GaugeMetricFamily(
             name="network_bandwidth_bytes_per_second",
             documentation="Network bandwidth usage per interface (bytes/sec)",
-            labels=["interface", "direction"]
+            labels=["hostname", "interface", "direction"]
         )
 
         for iface, stats in self.jetson.network.items():
-            network_gauge.add_metric([iface, "rx"], stats["rx_bytes_per_sec"])
-            network_gauge.add_metric([iface, "tx"], stats["tx_bytes_per_sec"])
+            network_gauge.add_metric([self.hostname, iface, "rx"], stats["rx_bytes_per_sec"])
+            network_gauge.add_metric([self.hostname, iface, "tx"], stats["tx_bytes_per_sec"])
 
         return [network_gauge]
 
