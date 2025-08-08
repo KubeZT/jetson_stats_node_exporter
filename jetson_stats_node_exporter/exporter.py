@@ -286,6 +286,45 @@ class JetsonExporter(object):
 
         return [power_gauge, avg_power_gauge]
 
+    def __fan(self):
+        logging.debug("Starting __fan() method")
+
+        fan_data = self.jetson.jtop_stats.get("fan", {}).get("pwmfan", {})
+        logging.debug(f"Fan data: {fan_data}")
+
+        fan_speed_gauge = GaugeMetricFamily(
+            name="fan_speed_percent",
+            documentation="Fan PWM speed (percentage)",
+            labels=["fan"],
+            unit="percent"
+        )
+
+        fan_rpm_gauge = GaugeMetricFamily(
+            name="fan_rpm",
+            documentation="Fan speed in RPM",
+            labels=["fan"]
+        )
+
+        fan_config_gauge = GaugeMetricFamily(
+            name="fan_config_info",
+            documentation="Fan configuration info (profile, governor, control)",
+            labels=["fan", "profile", "governor", "control"]
+        )
+
+        fan_name = "pwmfan"
+
+        speed = fan_data.get("speed", [0])[0]
+        rpm = fan_data.get("rpm", [0])[0]
+        profile = fan_data.get("profile", "unknown")
+        governor = fan_data.get("governor", "unknown")
+        control = fan_data.get("control", "unknown")
+
+        fan_speed_gauge.add_metric([fan_name], speed)
+        fan_rpm_gauge.add_metric([fan_name], rpm)
+        fan_config_gauge.add_metric([fan_name, profile, governor, control], 1)
+
+        return [fan_speed_gauge, fan_rpm_gauge, fan_config_gauge]
+
     def __disk(self):
         logging.debug("Starting __disk() method")
 
@@ -347,6 +386,7 @@ class JetsonExporter(object):
         yield from self.__temperature()
         yield from self.__integrated_power_machine_parts()
         yield from self.__integrated_power_total()
+        yield from self.__fan()
         yield from self.__disk()
         yield from self.__uptime()
         yield from self.__network_bandwidth()
