@@ -90,9 +90,9 @@ class JetsonExporter(object):
     def __gpu(self):
         logging.debug("Starting __gpu() method")
 
-        gpu = self.jetson.gpu.get("gpu", {})
-        status = gpu.get("status", {})
-        freq = gpu.get("freq", {})
+        gpu_data = self.jetson.jtop_stats.get("gpu", {}).get("gpu", {})
+        status = gpu_data.get("status", {})
+        freq = gpu_data.get("freq", {})
 
         # GPU Load
         load = status.get("load", 0.0)
