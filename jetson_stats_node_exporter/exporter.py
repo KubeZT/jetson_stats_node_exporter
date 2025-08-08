@@ -174,34 +174,56 @@ class JetsonExporter(object):
         return [emc_gauge]
 
     def __temperature(self):
+        logging.debug("Starting __temperature() method")
+
+        temperature_data = self.jetson.jtop_stats.get("temperature", {})
+        logging.debug(f"Temperature data: {temperature_data}")
+
         temperature_gauge = GaugeMetricFamily(
             name="temperature",
-            documentation=f"Temperature Statistics from Jetson Stats (unit: °C)",
+            documentation="Temperature Statistics from Jetson Stats (unit: °C)",
             labels=["statistic", "machine_part", "system_critical"],
             unit="C"
         )
-        for part, temp in self.jetson.jtop_stats['temperature'].items():
-            temperature_gauge.add_metric([part], value=temp["temp"])
+
+        for part, temp_info in temperature_data.items():
+            temp = temp_info.get("temp", -999)
+            online = temp_info.get("online", False)
+            system_critical = str(not online or temp <= -255).lower()
+            temperature_gauge.add_metric(["temp", part, system_critical], temp)
 
         return [temperature_gauge]
 
     def __integrated_power_machine_parts(self):
+        logging.debug("Starting __integrated_power_machine_parts() method")
+
+        power_data = self.jetson.jtop_stats.get("power", {}).get("rail", {})
+        logging.debug(f"Power rail data: {power_data}")
+
         power_gauge = GaugeMetricFamily(
             name="integrated_power",
             documentation="Power Statistics from internal power sensors (unit: mW/mV/mA)",
             labels=["statistic", "machine_part", "system_critical"]
         )
 
-        for part, reading in self.jetson.jtop_stats["power"]["rail"].items():
-            power_gauge.add_metric(["voltage", part], value=reading["volt"])
-            power_gauge.add_metric(["current", part], value=reading["curr"])
-            power_gauge.add_metric(["critical", part], value=reading["warn"])
-            power_gauge.add_metric(["power", part], value=reading["power"])
-            power_gauge.add_metric(["avg_power", part], value=reading["avg"])
+        for part, reading in power_data.items():
+            online = reading.get("online", False)
+            system_critical = str(not online or reading.get("warn", 0) > 80000).lower()
+
+            power_gauge.add_metric(["voltage", part, system_critical], reading.get("volt", 0))
+            power_gauge.add_metric(["current", part, system_critical], reading.get("curr", 0))
+            power_gauge.add_metric(["power", part, system_critical], reading.get("power", 0))
+            power_gauge.add_metric(["avg_power", part, system_critical], reading.get("avg", 0))
+            power_gauge.add_metric(["warn_threshold", part, system_critical], reading.get("warn", 0))
 
         return [power_gauge]
 
     def __integrated_power_total(self):
+        logging.debug("Starting __integrated_power_total() method")
+
+        total_power = self.jetson.jtop_stats.get("power", {}).get("tot", {})
+        logging.debug(f"Total power data: {total_power}")
+
         power_gauge = GaugeMetricFamily(
             name="integrated_power",
             documentation="Power Statistics from internal power sensors (unit: mW)",
@@ -209,35 +231,47 @@ class JetsonExporter(object):
             unit="mW"
         )
 
-        power_gauge.add_metric(["power"], value=self.jetson.jtop_stats["power"]["tot"]["power"])
-        power_gauge.add_metric(["avg_power"], value=self.jetson.jtop_stats["power"]["tot"]["avg"])
+        power_gauge.add_metric(["power", "total", "false"], total_power.get("power", 0))
+        power_gauge.add_metric(["avg_power", "total", "false"], total_power.get("avg", 0))
 
         return [power_gauge]
 
     def __disk(self):
+        logging.debug("Starting __disk() method")
+
+        disk_data = self.jetson.disk
+        logging.debug(f"Disk data: {disk_data}")
+
         disk_gauge = GaugeMetricFamily(
             name="disk",
             documentation=f"Local Storage Statistics from Jetson Stats (unit: {self.jetson.disk_units})",
-            labels=["mountpoint", "statistic"],
+            labels=["statistic"],
             unit="GB"
         )
-        for mountpoint, disk_info in self.jetson.disk.items():
-            if mountpoint == "/":
-                disk_gauge.add_metric(["total"], value=disk_info["total"])
-                disk_gauge.add_metric(["used"], value=disk_info["used"])
-                disk_gauge.add_metric(["free"], value=disk_info["free"])
-                disk_gauge.add_metric(["percent"], value=disk_info["percent"])
+
+        disk_gauge.add_metric(["total"], value=disk_data.get("total", 0))
+        disk_gauge.add_metric(["used"], value=disk_data.get("used", 0))
+        disk_gauge.add_metric(["available"], value=disk_data.get("available", 0))
+        disk_gauge.add_metric(["available_no_root"], value=disk_data.get("available_no_root", 0))
 
         return [disk_gauge]
 
     def __uptime(self):
+        logging.debug("Starting __uptime() method")
+
+        uptime = self.jetson.jtop_stats.get("uptime")
+        logging.debug(f"Uptime value: {uptime}")
+
         uptime_gauge = GaugeMetricFamily(
             name="uptime",
             documentation="Machine Uptime Statistics from Jetson Stats",
-            labels=["statistic", "runtime"],
+            labels=["statistic"],
             unit="s"
         )
-        uptime_gauge.add_metric(["alive"], value=self.jetson.jtop_stats["uptime"].total_seconds())
+
+        uptime_seconds = uptime.total_seconds() if uptime else 0
+        uptime_gauge.add_metric(["alive"], value=uptime_seconds)
+
         return [uptime_gauge]
 
     def __network_bandwidth(self):
